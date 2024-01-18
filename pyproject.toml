@@ -1,0 +1,66 @@
+[tool.poetry]
+name = "bood"
+version = "0.1.0"
+description = ""
+authors = ["Stefan <epiktetov.sv@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+djangorestframework = "^3.14.0"
+python-dotenv = "^1.0.0"
+psycopg2-binary = "^2.9.9"
+drf-spectacular = "^0.26.5"
+djoser = "^2.2.0"
+django-cors-headers = "^4.3.0"
+gunicorn = "^21.2.0"
+
+[tool.poetry.group.dev.dependencies]
+flake8 = "^6.1.0"
+flake8-django = "^1.4"
+flake8-pyproject = "^1.2.3"
+mypy = "^1.6.1"
+black = "^23.10.1"
+isort = "^5.12.0"
+pytest-django = "^4.6.0"
+coverage = "^7.3.2"
+types-requests = "^2.31.0.10"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.flake8]
+max-line-length = 120
+count = true
+ignore = ['E203']
+
+[tool.mypy]
+follow_imports = "silent"
+strict_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+disallow_any_generics = true
+check_untyped_defs = true
+no_implicit_reexport = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+
+[tool.isort]
+profile = "black"
+
+[tool.black]
+line-length = 120
+target-version = ['py310']
+include = '\.pyi?$'
+exclude = '''
+
+(
+  /(
+    | \.mypy_cache
+  )/
+)
+'''
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "bood.settings"
+python_files = ["py_tests/*.py"]
