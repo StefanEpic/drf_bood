@@ -12,7 +12,8 @@ from .api_docs import (
     calculate_current_retrieve_summary,
     calculate_standard_retrieve_summary,
     female_type_summary,
-    recommendation_summary,
+    recommendation_include_summary,
+    recommendation_exclude_summary,
     categoryrecommendation_list_summary,
     faq_list_summary,
 )
@@ -29,7 +30,8 @@ from .serializers import (
     PostEatingSerializer,
     GetEatingSerializer,
     CalculateSerializer,
-    RecommendationSerializer,
+    RecommendationIncludeSerializer,
+    RecommendationExcludeSerializer,
     FemaleTypeSerializer,
     ProductCategorySerializer,
     FAQSerializer,
@@ -218,11 +220,21 @@ class RecipeViewSet(viewsets.ModelViewSet):
         return view_validation(serializer)
 
 
-class RecommendationValuesView(RetrieveAPIView):
+class RecommendationIncludeView(RetrieveAPIView):
     permission_classes = [IsAuthenticated]
 
-    @recommendation_summary
+    @recommendation_include_summary
     def get(self, request, *args, **kwargs) -> Response:
         user_id = request.user.id
-        serializer = RecommendationSerializer(data=request.data, context={"user_id": user_id})
+        serializer = RecommendationIncludeSerializer(data=request.data, context={"user_id": user_id})
+        return calculate_view_validation(serializer)
+
+
+class RecommendationExcludeView(RetrieveAPIView):
+    permission_classes = [IsAuthenticated]
+
+    @recommendation_exclude_summary
+    def get(self, request, *args, **kwargs) -> Response:
+        user_id = request.user.id
+        serializer = RecommendationExcludeSerializer(data=request.data, context={"user_id": user_id})
         return calculate_view_validation(serializer)

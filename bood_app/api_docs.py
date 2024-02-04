@@ -1,7 +1,7 @@
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
 
-from bood_app.serializers import CalculateSerializer, RecommendationSerializer
+from bood_app.serializers import CalculateSerializer, RecommendationIncludeSerializer, RecommendationExcludeSerializer
 
 ####################################################
 
@@ -102,12 +102,22 @@ calculate_standard_retrieve_summary = extend_schema(
 )
 ####################################################
 
-recommendation_summary = extend_schema(
+recommendation_include_summary = extend_schema(
     summary="Получить рекомендацию по питанию",
-    description="В зависимости от съеденных за сегодня продуктов выдается рекомендация"
-    "о предлагаемых к включению в рацион продуктов или исключению",
+    description="В зависимости от съеденных за сегодня продуктов выдается рекомендация "
+    "о предлагаемых к включению в рацион продуктов",
     request=None,
-    responses=RecommendationSerializer,
+    responses=RecommendationIncludeSerializer,
+)
+
+####################################################
+
+recommendation_exclude_summary = extend_schema(
+    summary="Получить рекомендацию по питанию",
+    description="В зависимости от съеденных за сегодня продуктов выдается рекомендация "
+    "о предлагаемом к исключению из рациона продукте",
+    request=None,
+    responses=RecommendationExcludeSerializer,
 )
 
 ####################################################

@@ -183,6 +183,38 @@ class PersonCardTestCase(BaseInitTestCase):
         self.assertEqual(response.data["status"], "400")
         self.assertTrue(response.data["error"]["exclude_category"])
 
+    def test_post_invalid_exclude_product_limit(self) -> None:
+        data = {
+            "height": 175,
+            "age": 30,
+            "gender": "male",
+            "activity": "1.2",
+            "femaletype": [],
+            "exclude_products": [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3],
+            "exclude_category": [],
+        }
+        token = self.get_authorization(2)
+        response = self.client.post(self.url, data, headers=token, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["status"], "400")
+        self.assertEqual(response.data["error"], "Limit of excluded products 20")
+
+    def test_post_invalid_exclude_category_limit(self) -> None:
+        data = {
+            "height": 175,
+            "age": 30,
+            "gender": "male",
+            "activity": "1.2",
+            "femaletype": [],
+            "exclude_products": [1],
+            "exclude_category": [1, 2, 3, 4, 5, 6],
+        }
+        token = self.get_authorization(2)
+        response = self.client.post(self.url, data, headers=token, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["status"], "400")
+        self.assertEqual(response.data["error"], "Limit of excluded products categories 5")
+
     def test_patch_valid(self) -> None:
         data = {"height": 185, "age": 25}
         response = self.client.patch(self.url_detail, data, headers=self.token, format="json")
@@ -190,6 +222,42 @@ class PersonCardTestCase(BaseInitTestCase):
         self.assertEqual(response.data["status"], "200")
         self.assertEqual(response.data["detail"]["height"], data["height"])
         self.assertEqual(response.data["detail"]["age"], data["age"])
+
+    def test_patch_invalid_femaletype(self) -> None:
+        data = {"femaletype": [1]}
+        response = self.client.patch(self.url_detail, data, headers=self.token, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["status"], "400")
+        self.assertEqual(response.data["error"], "Male gender can't have female type")
+
+    def test_patch_invalid_product_limit(self) -> None:
+        data = {"exclude_products": [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3]}
+        response = self.client.patch(self.url_detail, data, headers=self.token, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["status"], "400")
+        self.assertEqual(response.data["error"], "Limit of excluded products 20")
+
+    def test_patch_invalid_category_limit(self) -> None:
+        data = {"exclude_category": [1, 2, 3, 4, 5, 6]}
+        response = self.client.patch(self.url_detail, data, headers=self.token, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["status"], "400")
+        self.assertEqual(response.data["error"], "Limit of excluded products categories 5")
+
+    def test_patch_change_gender(self) -> None:
+        data = {"gender": "female", "femaletype": [1]}
+        response = self.client.patch(self.url_detail, data, headers=self.token, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["status"], "200")
+        self.assertEqual(response.data["detail"]["gender"], data["gender"])
+        self.assertEqual(response.data["detail"]["femaletype"], data["femaletype"])
+
+        data = {"gender": "male"}
+        response = self.client.patch(self.url_detail, data, headers=self.token, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["status"], "200")
+        self.assertEqual(response.data["detail"]["gender"], data["gender"])
+        self.assertEqual(response.data["detail"]["femaletype"], [])
 
     def test_delete_valid(self) -> None:
         response = self.client.delete(self.url_detail, headers=self.token)

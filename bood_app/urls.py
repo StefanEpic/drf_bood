@@ -9,7 +9,8 @@ from .views import (
     CurrentValuesView,
     MeasurementViewSet,
     RecipeViewSet,
-    RecommendationValuesView,
+    RecommendationIncludeView,
+    RecommendationExcludeView,
     FemaleTypeViewSet,
     ProductCategoryViewSet,
     FAQViewSet,
@@ -29,5 +30,6 @@ urlpatterns = [
     path("", include(router.urls)),
     path("calculate/standard/", StandardValuesView.as_view(), name="standard"),
     path("calculate/current/", CurrentValuesView.as_view(), name="current"),
-    path("recommendation/", RecommendationValuesView.as_view(), name="recommendation"),
+    path("recommendation/include", RecommendationIncludeView.as_view(), name="recommendation_include"),
+    path("recommendation/exclude", RecommendationExcludeView.as_view(), name="recommendation_exclude"),
 ]

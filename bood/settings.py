@@ -9,7 +9,9 @@ https://docs.djangoproject.com/en/4.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
+
 import os
+import sys
 from datetime import timedelta
 from pathlib import Path
 
@@ -96,15 +98,16 @@ DJOSER = {
     "ACTIVATION_URL": "api/v1/users/activation/{uid}/{token}",
     "SEND_ACTIVATION_EMAIL": True,
     "SEND_CONFIRMATION_EMAIL": True,
-    "PASSWORD_CHANGED_EMAIL_CONFIRMATION": True,
-    "PASSWORD_RESET_CONFIRM_URL": "api/v1/users/password-reset/{uid}/{token}",
+    "PASSWORD_CHANGED_EMAIL_CONFIRMATION": False,
+    "PASSWORD_RESET_CONFIRM_URL": "api/v1/users/reset_password_confirm/{uid}/{token}",
+    "USERNAME_RESET_CONFIRM_URL": "api/v1/users/reset_email_confirm/{uid}/{token}",
     "SET_PASSWORD_RETYPE": True,
     "PASSWORD_RESET_SHOW_EMAIL_NOT_FOUND": True,
     "TOKEN_MODEL": None,  # To Delete User Must Set it to None
     "SERIALIZERS": {
-        "user_create": "bood_account.serializers.UserCreateSerializer",
-        "user": "bood_account.serializers.UserCreateSerializer",
-        "user_delete": "djoser.serializers.UserDeleteSerializer",
+        "user_create": "bood_account.serializers.PersonCreateSerializer",
+        "user": "bood_account.serializers.PersonCreateSerializer",
+        "user_delete": "bood_account.serializers.PersonDeleteSerializer",
     },
     "EMAIL": {
         "activation": "bood_account.email.ActivationEmail",
@@ -162,6 +165,11 @@ DATABASES = {
     }
 }
 
+if "test" in sys.argv:
+    DATABASES["default"] = {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": BASE_DIR / "db.sqlite3",
+    }
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
@@ -174,10 +182,19 @@ AUTH_PASSWORD_VALIDATORS = [
         "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
     },
     {
+        "NAME": "bood_account.validators.PasswordMaxLengthValidator",
+    },
+    {
         "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
     },
     {
         "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
+    },
+    {
+        "NAME": "bood_account.validators.LetterPasswordValidator",
+    },
+    {
+        "NAME": "bood_account.validators.SymbolPasswordValidator",
     },
 ]
 
@@ -190,7 +207,7 @@ TIME_ZONE = "Europe/Moscow"
 
 USE_I18N = True
 
-USE_TZ = True
+USE_TZ = False
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
@@ -211,10 +228,6 @@ SPECTACULAR_SETTINGS = {
     # OTHER SETTINGS
 }
 
-# # Frontend APP
-# CORS_ALLOWED_ORIGINS = [
-#     "http://localhost:3000",
-#     "http://127.0.0.1:3000",
-#  ]
+# Frontend APP
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True

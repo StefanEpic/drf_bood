@@ -1,6 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import BaseUserManager, AbstractBaseUser
 
+from bood_account.validators import validate_name_field
+
 
 # Custom User Manager
 class UserManager(BaseUserManager):
@@ -29,10 +31,10 @@ class UserManager(BaseUserManager):
 class Person(AbstractBaseUser):
     email = models.EmailField(
         verbose_name="Эл. почта",
-        max_length=255,
+        max_length=60,
         unique=True,
     )
-    name = models.CharField(max_length=255, blank=True, verbose_name="Имя")
+    name = models.CharField(max_length=30, validators=[validate_name_field], verbose_name="Имя")
     is_active = models.BooleanField(default=True, verbose_name="Активен")
     is_admin = models.BooleanField(default=False, verbose_name="Админ")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Зарегистрирован")

@@ -5,6 +5,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.test import APITestCase, APIRequestFactory
 from .models import Person
+from .validators import PasswordMaxLengthValidator, LetterPasswordValidator, SymbolPasswordValidator
 from .views import UserActivationView
 
 
@@ -32,11 +33,46 @@ class UserViewSetTest(APITestCase):
         self.assertTrue(response.data["access"])
         self.assertTrue(response.data["refresh"])
 
+    def test_create_user_invalid_name_length(self) -> None:
+        data = {"name": "T", "email": "test@mail.ru", "password": "FU7I3kf5PO34kf"}
+        response = self.client.post(self.url_user, data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["name"][0], "The name field length must be between 2 and 30 letters")
+
+    def test_create_user_invalid_name_symbol(self) -> None:
+        data = {"name": "Tom Hardy", "email": "test@mail.ru", "password": "FU7I3kf5PO34kf"}
+        response = self.client.post(self.url_user, data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["name"][0], "The name field can only contain letters or the sign '-'")
+
+    def test_create_user_invalid_password_length(self) -> None:
+        data = {
+            "name": "Tom",
+            "email": "test@mail.ru",
+            "password": "FU7I3kf5PO34kfFU7I3kf5PO34kfFU7I3kf5PO34kfFU7I3kf5PO34kf",
+        }
+        response = self.client.post(self.url_user, data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["password"][0], "This password must contain no more than 30 characters.")
+
+    def test_create_user_invalid_password_only_letter(self) -> None:
+        data = {"name": "Tom", "email": "test@mail.ru", "password": "frtghyujkiol"}
+        response = self.client.post(self.url_user, data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["password"][0], "This password is entirely letter.")
+
+    def test_create_user_invalid_password_only_symbol(self) -> None:
+        data = {"name": "Tom", "email": "test@mail.ru", "password": "!#$%&'()*+,-./"}
+        response = self.client.post(self.url_user, data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["password"][0], "This password is entirely symbol.")
+
     def test_create_user(self) -> None:
-        data = {"email": "test@mail.ru", "password": "FU7I3kf5PO34kf"}
+        data = {"name": "Test", "email": "test@mail.ru", "password": "FU7I3kf5PO34kf"}
         response = self.client.post(self.url_user, data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         user = Person.objects.get(id=response.data["id"])
+        self.assertEqual(user.name, data["name"])
         self.assertEqual(user.email, data["email"])
 
     def test_create_user_manager(self) -> None:
@@ -105,3 +141,14 @@ class UserViewSetTest(APITestCase):
 
             # Assert the response contains the expected content
             self.assertEqual(response.data, expected_content)
+
+    def test_PasswordMaxLengthValidator_help_text(self) -> None:
+        self.assertEqual(
+            PasswordMaxLengthValidator().get_help_text(), "Your password must contain no more than 30 characters."
+        )
+
+    def test_LetterPasswordValidator_help_text(self) -> None:
+        self.assertEqual(LetterPasswordValidator().get_help_text(), "Your password can’t be entirely letter.")
+
+    def test_SymbolPasswordValidator_help_text(self) -> None:
+        self.assertEqual(SymbolPasswordValidator().get_help_text(), "Your password can’t be entirely symbol.")

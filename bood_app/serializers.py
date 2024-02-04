@@ -1,12 +1,8 @@
-from datetime import datetime
-
 from django.utils import timezone
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
-
-from bood_account.models import Person
 from bood_account.serializers import PersonCreateSerializer
 from .models import (
     Product,
@@ -21,6 +17,7 @@ from .models import (
     FAQ,
 )
 from .services.kbjy import KBJYService, RecommendationService
+from .utils.calculate_date_validation import check_dateformat_or_get_current_date
 from .utils.eating_validation import eating_validation
 from .utils.person_card_validation import get_person_card
 
@@ -97,43 +94,52 @@ class PostPersonCardSerializer(serializers.ModelSerializer):
         read_only_fields = ("id", "person", "measurements")
 
     def create(self, validated_data) -> dict:
-        height = validated_data.pop("height")
-        age = validated_data.pop("age")
-        gender = validated_data.pop("gender")
-        target = validated_data.pop("target", "")
-        activity = validated_data.pop("activity")
-        image = validated_data.pop("image", "")
-        femaletype = validated_data.pop("femaletype", None)
-        exclude_products = validated_data.pop("exclude_products", None)
-        exclude_category = validated_data.pop("exclude_category", None)
+        gender = validated_data.get("gender")
+        femaletype = validated_data.get("femaletype")
+        exclude_products = validated_data.get("exclude_products")
+        exclude_category = validated_data.get("exclude_category")
         user_id = self.context["user_id"]
-        person = Person.objects.get(id=user_id)
 
         person_card = PersonCard.objects.filter(person__id=user_id).first()
         if person_card is not None:
             raise ValidationError({"status": "400", "error": "You already have person card"})
 
-        person_card = PersonCard.objects.create(
-            person=person,
-            height=height,
-            age=age,
-            gender=gender,
-            target=target,
-            activity=activity,
-            image=image,
-        )
-
         if femaletype:
-            if gender == 'male':
+            if gender == "male":
                 raise ValidationError({"status": "400", "error": "Male gender can't have female type"})
-            person_card.femaletype.set(femaletype)
-        if exclude_products:
-            person_card.exclude_products.set(exclude_products)
-        if exclude_category:
-            person_card.exclude_category.set(exclude_category)
 
-        person_card.save()
-        return person_card
+        if exclude_products:
+            if len(exclude_products) > 20:
+                raise ValidationError({"status": "400", "error": "Limit of excluded products 20"})
+
+        if exclude_category:
+            if len(exclude_category) > 5:
+                raise ValidationError({"status": "400", "error": "Limit of excluded products categories 5"})
+
+        validated_data.update({"person_id": user_id})
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        gender = validated_data.get("gender", None)
+        femaletype = validated_data.get("femaletype", None)
+        exclude_products = validated_data.get("exclude_products", None)
+        exclude_category = validated_data.get("exclude_category", None)
+
+        if femaletype and instance.gender == "male" and gender != "female" or femaletype and gender == "male":
+            raise ValidationError({"status": "400", "error": "Male gender can't have female type"})
+
+        if gender == "male":
+            validated_data.update({"femaletype": []})
+
+        if exclude_products:
+            if len(exclude_products) > 20:
+                raise ValidationError({"status": "400", "error": "Limit of excluded products 20"})
+
+        if exclude_category:
+            if len(exclude_category) > 5:
+                raise ValidationError({"status": "400", "error": "Limit of excluded products categories 5"})
+
+        return super().update(instance, validated_data)
 
 
 class GetPersonCardSerializer(PostPersonCardSerializer):
@@ -166,16 +172,8 @@ class PostRecipeSerializer(serializers.ModelSerializer):
         fields = ("id", "title", "description", "person_card", "image", "is_active", "product_weight")
         read_only_fields = ("id", "person_card", "is_active")
 
-    def create(self, validated_data):
-        product_weight = validated_data.pop("product_weight")
-        if not product_weight:
-            raise serializers.ValidationError({"status": "400", "error": "Product not found"})
-
-        user_id = self.context["user_id"]
-        person_card = get_person_card(user_id)
-        recipe = Recipe.objects.create(person_card=person_card, **validated_data)
-        recipe.save()
-
+    @staticmethod
+    def __product_weight_create(product_weight, recipe):
         for product in product_weight:
             added_products = ProductWeight.objects.filter(recipe=recipe)
             if added_products and product["product"].pk in [name.product.pk for name in added_products]:
@@ -186,6 +184,18 @@ class PostRecipeSerializer(serializers.ModelSerializer):
                         break
                 continue
             ProductWeight.objects.create(recipe=recipe, **product)
+
+    def create(self, validated_data):
+        product_weight = validated_data.pop("product_weight")
+        if not product_weight:
+            raise serializers.ValidationError({"status": "400", "error": "Product not found"})
+
+        user_id = self.context["user_id"]
+        person_card = get_person_card(user_id)
+        recipe = Recipe.objects.create(person_card=person_card, **validated_data)
+        recipe.save()
+
+        self.__product_weight_create(product_weight, recipe)
         return recipe
 
     def update(self, instance, validated_data):
@@ -196,16 +206,7 @@ class PostRecipeSerializer(serializers.ModelSerializer):
         instance.save()
         product_weight = validated_data.pop("product_weight")
 
-        for product in product_weight:
-            added_products = ProductWeight.objects.filter(recipe=instance)
-            if added_products and product["product"].pk in [name.product.pk for name in added_products]:
-                for added_product in added_products:
-                    if added_product.product.pk == product["product"].pk:
-                        added_product.weight += product["weight"]
-                        added_product.save()
-                        break
-                continue
-            ProductWeight.objects.create(recipe=instance, **product)
+        self.__product_weight_create(product_weight, instance)
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
@@ -300,15 +301,8 @@ class CalculateSerializer(serializers.Serializer):
         if context:
             user_id = context["user_id"]
             str_date = context["date"]
-            if str_date:
-                try:
-                    date = datetime.strptime(str_date, "%Y-%m-%d")
-                except ValueError:
-                    raise ValidationError({"status": 400, "error": "Invalid date format"})
-            else:
-                date = timezone.now().date()
-
             calculate_type = context["calculate_type"]
+            date = check_dateformat_or_get_current_date(str_date)
             person_card = get_person_card(user_id)
             person = KBJYService(person_card, date)
             imt = person.get_imt()
@@ -356,20 +350,41 @@ class CalculateSerializer(serializers.Serializer):
         return self.instance["water"]
 
 
-class RecommendationSerializer(serializers.Serializer):
+class RecommendationIncludeSerializer(serializers.Serializer):
     products = serializers.SerializerMethodField()
+    log = serializers.SerializerMethodField()
 
     def __init__(self, context=None, instance=None, *args, **kwargs):
         super().__init__(instance, *args, **kwargs)
         if context:
             user_id = context["user_id"]
             person_card = get_person_card(user_id)
-            person = RecommendationService(person_card)
-            self.recommendation = person.get_recommendation()
+            date = timezone.now().date()
+            person = RecommendationService(person_card, date)
+            self.recommendation = person.get_include_products()
+            self.log = person.get_log_info()
+
+    @extend_schema_field(ProductSerializerWithCategory(many=True))
+    def get_products(self, obj):
+        return ProductSerializerWithCategory(self.recommendation, many=True).data
+
+    @extend_schema_field(OpenApiTypes.OBJECT)
+    def get_log(self, obj):
+        return self.log
+
+
+class RecommendationExcludeSerializer(serializers.Serializer):
+    product = serializers.SerializerMethodField()
+
+    def __init__(self, context=None, instance=None, *args, **kwargs):
+        super().__init__(instance, *args, **kwargs)
+        if context:
+            user_id = context["user_id"]
+            person_card = get_person_card(user_id)
+            date = timezone.now().date()
+            person = RecommendationService(person_card, date)
+            self.recommendation = person.get_exclude_product()
 
     @extend_schema_field(ProductSerializerWithCategory)
-    def get_products(self, obj):
-        if self.recommendation.get("include", None):
-            return {"include": ProductSerializerWithCategory(self.recommendation["include"], many=True).data}
-        if self.recommendation.get("exclude", None):
-            return {"exclude": ProductSerializerWithCategory(self.recommendation["exclude"], many=True).data}
+    def get_product(self, obj):
+        return ProductSerializerWithCategory(self.recommendation).data

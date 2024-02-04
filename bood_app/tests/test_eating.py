@@ -1,6 +1,8 @@
+from django.contrib.admin import AdminSite
 from django.urls import reverse
 from rest_framework import status
 
+from bood_app.admin import EatingAdmin
 from bood_app.models import Eating
 from bood_app.tests.base_classes import BaseInitTestCase
 
@@ -16,6 +18,17 @@ class EatingTestCase(BaseInitTestCase):
         self.assertEqual(str(self.eating1), self.eating1.person_card.person.email)
         self.assertEqual(str(self.productweight1), self.productweight1.product.title)
         self.assertEqual(str(self.water1), str(self.water1.weight))
+
+    def test_admin_panel(self) -> None:
+        site = AdminSite()
+        eating_admin = EatingAdmin(Eating, site)
+        eating_product = eating_admin.get_weight(self.eating1)
+        eating_recipe = eating_admin.get_weight(self.eating2)
+        eating_water = eating_admin.get_weight(self.eating3)
+        eating_recipe_weight = self.productweight1.weight + self.productweight2.weight
+        self.assertEqual(self.eating1.product_weight.weight, eating_product)
+        self.assertEqual(eating_recipe_weight, eating_recipe)
+        self.assertEqual(self.eating3.water.weight, eating_water)
 
     def test_get_valid(self) -> None:
         response = self.client.get(self.url, headers=self.token)

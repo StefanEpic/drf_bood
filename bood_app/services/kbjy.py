@@ -1,8 +1,9 @@
+import json
+
 from django.db.models import Q
-from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
-from bood_app.models import PersonCard, Measurement, ProductWeight, Product, Water
+from bood_app.models import PersonCard, Measurement, ProductWeight, Product, Water, ProductCategory
 import datetime
 
 
@@ -32,13 +33,94 @@ def get_measurements(person_card: PersonCard, date: datetime.date) -> Measuremen
     """
     Получение последних замеров пользователя
     """
-    try:
-        measurements = Measurement.objects.filter(person_card_id=person_card.pk, datetime_add__date__lte=date).order_by(
-            "-datetime_add"
-        )[0]
-        return measurements
-    except IndexError:
-        raise ValidationError({"status": "400", "error": "Measurements not found"})
+    measurements = (
+        Measurement.objects.filter(person_card_id=person_card.id, datetime_add__date__lte=date)
+        .order_by("-datetime_add")
+        .first()
+    )
+    log = json.dumps({"person_card": str(person_card.person.email), "date": str(date)}, ensure_ascii=False)
+    if not measurements:
+        raise ValidationError({"status": "400", "error": "Measurements not found", "log": log})
+    return measurements
+
+
+def get_one_product_by_proportion(
+    proteins_proportion: float,
+    fats_proportion: float,
+    carbohydrates_proportion: float,
+    error_value: float,
+    exclude_products_ids: list,
+    exclude_categories_ids: list,
+) -> Product:
+    """
+    Найти продукт с похожей пропорцией с учетом погрешности, и с исключением определенных продуктов и категорий
+    """
+    product = (
+        Product.objects.filter(
+            Q(
+                proteins_proportion__gte=proteins_proportion - error_value,
+                fats_proportion__gte=fats_proportion - error_value,
+                carbohydrates_proportion__gte=carbohydrates_proportion - error_value,
+            )
+            & Q(
+                proteins_proportion__lte=proteins_proportion + error_value,
+                fats_proportion__lte=fats_proportion + error_value,
+                carbohydrates_proportion__lte=carbohydrates_proportion + error_value,
+            )
+            & Q(category__isnull=False)
+        )
+        .exclude(Q(id__in=exclude_products_ids) | Q(category__id__in=exclude_categories_ids))
+        .first()
+    )
+    return product
+
+
+def get_products_group_by_proportion(
+    person_card: PersonCard,
+    proteins_proportion: float,
+    fats_proportion: float,
+    carbohydrates_proportion: float,
+    exclude_eaten_product_by_recommendation: Product,
+) -> list:
+    """
+    Получить список продуктов без исключенных продуктов
+    """
+    result = []
+    product = None
+    error_value = 5
+    find_product_cycle_counts = 0
+    exclude_products_ids = list(Product.objects.filter(personcard=person_card).values_list("id", flat=True))
+    exclude_categories_ids = list(ProductCategory.objects.filter(personcard=person_card).values_list("id", flat=True))
+    # Исключение из рекомендованного списка продуктов рекомендованный к исключению продукт
+    exclude_products_ids.append(exclude_eaten_product_by_recommendation.id)
+    # Поиск продуктов в БД с увеличением погрешности поиска, пока не найдено 4 продукта или не выполнен лимит запросов
+    while len(result) < 4:
+        # Поиск продукта. Добавление категории найденного продукта в список исключаемых
+        while not product and find_product_cycle_counts < 50:
+            product = get_one_product_by_proportion(
+                proteins_proportion,
+                fats_proportion,
+                carbohydrates_proportion,
+                error_value,
+                exclude_products_ids,
+                exclude_categories_ids,
+            )
+            # Рост погрешности в прогрессии
+            if error_value < 10:
+                error_value += 5
+            else:
+                error_value += 20
+            find_product_cycle_counts += 1
+
+        if find_product_cycle_counts < 50:
+            result.append(product)
+            exclude_categories_ids.append(product.category.id)
+            product = None
+            error_value = 1
+            find_product_cycle_counts = 0
+        else:
+            break
+    return result
 
 
 class KBJYService:
@@ -46,15 +128,15 @@ class KBJYService:
     Расчет КБЖУ
     """
 
-    def __init__(self, person_card: PersonCard, date: datetime.date = timezone.now().date()):
-        measurements = get_measurements(person_card, date)
+    def __init__(self, person_card: PersonCard, date: datetime.date):
+        self.measurements = get_measurements(person_card, date)
         self.date = date
         self.id = person_card.pk
         self.gender = person_card.gender
         self.age = person_card.age
-        self.weight = measurements.weight
+        self.weight = self.measurements.weight
         self.height = person_card.height
-        self.hand = measurements.hand
+        self.hand = self.measurements.hand
         self.amr = float(person_card.activity)
         self.ideal_weight = get_ideal_weight(self.gender, self.hand, self.height)
 
@@ -89,18 +171,18 @@ class KBJYService:
         calories = 0.0
         if self.gender == "male":
             calories = (
-                               ((10 * self.ideal_weight) + (6.25 * self.height) - (5 * self.age) + 5)
-                               + (self.ideal_weight * 24)
-                               + (21.3 * self.ideal_weight + 370)
-                               + (66.5 + 13.7 * self.ideal_weight + 5 * self.height - 6.8 * self.age)
-                       ) / 4
+                ((10 * self.ideal_weight) + (6.25 * self.height) - (5 * self.age) + 5)
+                + (self.ideal_weight * 24)
+                + (21.3 * self.ideal_weight + 370)
+                + (66.5 + 13.7 * self.ideal_weight + 5 * self.height - 6.8 * self.age)
+            ) / 4
         if self.gender == "female":
             calories = (
-                               ((10 * self.ideal_weight) + (6.25 * self.height) - (5 * self.age) - 161)
-                               + (self.ideal_weight * 24)
-                               + (21.3 * self.ideal_weight + 370)
-                               + (447.6 + 9.2 * self.ideal_weight + 3.1 * self.height - 4.3 * self.age)
-                       ) / 4
+                ((10 * self.ideal_weight) + (6.25 * self.height) - (5 * self.age) - 161)
+                + (self.ideal_weight * 24)
+                + (21.3 * self.ideal_weight + 370)
+                + (447.6 + 9.2 * self.ideal_weight + 3.1 * self.height - 4.3 * self.age)
+            ) / 4
 
         total_calories = (calories + (calories * 0.1)) * self.amr
         proteins = calories * 0.14 / 3.8
@@ -124,10 +206,11 @@ class KBJYService:
             Q(eating__datetime_add__date=self.date, eating__person_card_id=self.id)
             | Q(recipe__eating__datetime_add__date=self.date, recipe__eating__person_card_id=self.id)
         )
-        water_list = sum(Water.objects.filter(
-            eating__datetime_add__date=self.date,
-            eating__person_card_id=self.id).values_list("weight", flat=True)
-                         )
+        water_list = sum(
+            Water.objects.filter(eating__datetime_add__date=self.date, eating__person_card_id=self.id).values_list(
+                "weight", flat=True
+            )
+        )
 
         calories = 0.0
         proteins = 0.0
@@ -152,87 +235,176 @@ class KBJYService:
         }
 
 
-class RecommendationService:
+class RecommendationService(KBJYService):
     """
     Подбор рекомендаций
     """
 
-    def __init__(self, person_card: PersonCard, date: datetime.date = timezone.now().date()):
+    def __init__(self, person_card: PersonCard, date: datetime.date):
+        super().__init__(person_card, date)
         self.person_card = person_card
-        kbjy_service = KBJYService(self.person_card)
-        standard = kbjy_service.get_standard()
-        current = kbjy_service.get_current()
-        self.standard_proteins = standard["proteins"]
-        self.standard_fats = standard["fats"]
-        self.standard_carbohydrates = standard["carbohydrates"]
-        self.current_proteins = current["proteins"]
-        self.current_fats = current["fats"]
-        self.current_carbohydrates = current["carbohydrates"]
         self.date = date
+        self.standard = self.get_standard()
+        self.current = self.get_current()
+        self.split_proteins = self.standard["proteins"] - self.current["proteins"]
+        self.split_fats = self.standard["fats"] - self.current["fats"]
+        self.split_carbohydrates = self.standard["carbohydrates"] - self.current["carbohydrates"]
+        self.proportion = [self.split_proteins, self.split_fats, self.split_carbohydrates]
         self.eaten_products = Product.objects.filter(
             Q(
                 product_weight__eating__datetime_add__date=self.date,
-                product_weight__eating__person_card_id=person_card.id,
+                product_weight__eating__person_card_id=self.person_card.pk,
             )
             | Q(
                 product_weight__recipe__eating__datetime_add__date=self.date,
-                product_weight__recipe__eating__person_card_id=person_card.id,
+                product_weight__recipe__eating__person_card_id=self.person_card.pk,
             )
         )
+        self.log = json.dumps(
+            {
+                "person_card": str(self.person_card.person.email),
+                "measurements_person_card": str(self.measurements.person_card),
+                "measurements_datetime": str(self.measurements.datetime_add),
+                "autogenerate_today__date": str(self.date),
+                "standard": self.standard,
+                "current": self.current,
+                "eaten_products": [str(p) for p in self.eaten_products],
+            },
+            ensure_ascii=False,
+        )
 
-    def get_recommendation(self) -> dict:
+    def __find_exclude_product(self) -> Product:
+        """
+        Поиск рекомендованного к исключению продукта
+        """
+        proportion = {
+            "proteins": self.split_proteins,
+            "fats": self.split_fats,
+            "carbohydrates": self.split_carbohydrates,
+        }
+        max_value = sorted(proportion.items(), key=lambda item: item[1])[-1]
+        result = self.eaten_products.order_by(max_value[0]).first()
+        return result
+
+    def get_include_products(self) -> list:
         """
         Получение списка рекомендованных продуктов
         """
+        # Необходимо съесть минимум 3 продукта
         if len(self.eaten_products) > 2:
-            if (
-                    self.current_proteins < self.standard_proteins
-                    and self.current_fats < self.standard_fats
-                    and self.current_carbohydrates < self.standard_carbohydrates
-            ):
-                proteins = self.standard_proteins - self.current_proteins
-                fats = self.standard_fats - self.current_fats
-                carbohydrates = self.standard_carbohydrates - self.current_carbohydrates
-                proportion = [proteins, fats, carbohydrates]
-                min_value = min(proportion)
-                proteins_proportion = round(proteins / min_value, 2)
-                fats_proportion = round(fats / min_value, 2)
-                carbohydrates_proportion = round(carbohydrates / min_value, 2)
+            exclude_product = self.__find_exclude_product()
+            # БЖУ ниже нормы
+            if self.split_proteins > 0 and self.split_fats > 0 and self.split_carbohydrates > 0:
+                min_value = min(self.proportion)
+                proteins_proportion = round(self.split_proteins / min_value, 2)
+                fats_proportion = round(self.split_fats / min_value, 2)
+                carbohydrates_proportion = round(self.split_carbohydrates / min_value, 2)
+                return get_products_group_by_proportion(
+                    self.person_card,
+                    proteins_proportion,
+                    fats_proportion,
+                    carbohydrates_proportion,
+                    exclude_product,
+                )
+            # БЖУ выше нормы
+            if self.split_proteins < 0 and self.split_fats < 0 and self.split_carbohydrates < 0:
+                max_value = max(self.proportion)
+                proteins_proportion = round(max_value / self.split_proteins, 2)
+                fats_proportion = round(max_value / self.split_fats, 2)
+                carbohydrates_proportion = round(max_value / self.split_carbohydrates, 2)
+                return get_products_group_by_proportion(
+                    self.person_card,
+                    proteins_proportion,
+                    fats_proportion,
+                    carbohydrates_proportion,
+                    exclude_product,
+                )
+            # Б ниже нормы, ЖУ выше нормы
+            if self.split_proteins > 0 and self.split_fats <= 0 and self.split_carbohydrates <= 0:
+                proteins_proportion = abs(self.split_proteins)
+                fats_proportion = 1
+                carbohydrates_proportion = 1
+                return get_products_group_by_proportion(
+                    self.person_card,
+                    proteins_proportion,
+                    fats_proportion,
+                    carbohydrates_proportion,
+                    exclude_product,
+                )
+            # Ж ниже нормы, БУ выше нормы
+            if self.split_proteins <= 0 and self.split_fats > 0 and self.split_carbohydrates <= 0:
+                proteins_proportion = 1
+                fats_proportion = abs(self.split_fats)
+                carbohydrates_proportion = 1
+                return get_products_group_by_proportion(
+                    self.person_card,
+                    proteins_proportion,
+                    fats_proportion,
+                    carbohydrates_proportion,
+                    exclude_product,
+                )
+            # У ниже нормы, БЖ выше нормы
+            if self.split_proteins <= 0 and self.split_fats <= 0 and self.split_carbohydrates > 0:
+                proteins_proportion = 1
+                fats_proportion = 1
+                carbohydrates_proportion = abs(self.split_carbohydrates)
+                return get_products_group_by_proportion(
+                    self.person_card,
+                    proteins_proportion,
+                    fats_proportion,
+                    carbohydrates_proportion,
+                    exclude_product,
+                )
+            # БЖ ниже нормы, У выше нормы
+            if self.split_proteins > 0 and self.split_fats > 0 and self.split_carbohydrates <= 0:
+                proteins_proportion = abs(self.split_proteins)
+                fats_proportion = abs(self.split_fats)
+                carbohydrates_proportion = 1
+                return get_products_group_by_proportion(
+                    self.person_card,
+                    proteins_proportion,
+                    fats_proportion,
+                    carbohydrates_proportion,
+                    exclude_product,
+                )
+            # ЖУ ниже нормы, Б выше нормы
+            if self.split_proteins <= 0 and self.split_fats > 0 and self.split_carbohydrates > 0:
+                proteins_proportion = 1
+                fats_proportion = abs(self.split_fats)
+                carbohydrates_proportion = abs(self.split_carbohydrates)
+                return get_products_group_by_proportion(
+                    self.person_card,
+                    proteins_proportion,
+                    fats_proportion,
+                    carbohydrates_proportion,
+                    exclude_product,
+                )
+            # БУ ниже нормы, Ж выше нормы
+            if self.split_proteins > 0 and self.split_fats <= 0 and self.split_carbohydrates > 0:
+                proteins_proportion = abs(self.split_proteins)
+                fats_proportion = 1
+                carbohydrates_proportion = abs(self.split_carbohydrates)
+                return get_products_group_by_proportion(
+                    self.person_card,
+                    proteins_proportion,
+                    fats_proportion,
+                    carbohydrates_proportion,
+                    exclude_product,
+                )
+        else:
+            raise ValidationError(
+                {"status": "400", "error": "There are too low eating to make recommendations", "log": self.log}
+            )
 
-                exclude_products_ids = Product.objects.filter(
-                    Q(personcard=self.person_card) | Q(category__personcard=self.person_card) | Q(category__isnull=True)
-                ).values_list("id", flat=True)
+    def get_log_info(self):
+        return self.log
 
-                result = []
-                error_value = 0.1
-                end_cycle = 0
-                while len(result) < 4 and end_cycle < 100:
-                    result = Product.objects.filter(
-                        Q(
-                            proteins_proportion__gte=proteins_proportion - error_value,
-                            fats_proportion__gte=fats_proportion - error_value,
-                            carbohydrates_proportion__gte=carbohydrates_proportion - error_value,
-                        )
-                        & Q(
-                            proteins_proportion__lte=proteins_proportion + error_value,
-                            fats_proportion__lte=fats_proportion + error_value,
-                            carbohydrates_proportion__lte=carbohydrates_proportion + error_value,
-                        )
-                    ).exclude(id__in=exclude_products_ids)[:4]
-                    error_value += 0.1
-                    end_cycle += 1
-                return {"include": result}
-            if (
-                    self.current_proteins > self.standard_proteins
-                    or self.current_fats > self.standard_fats
-                    or self.current_carbohydrates > self.standard_carbohydrates
-            ):
-                proteins = self.current_proteins - self.standard_proteins
-                fats = self.current_fats - self.standard_fats
-                carbohydrates = self.current_carbohydrates - self.standard_carbohydrates
-                proportion = {"proteins": proteins, "fats": fats, "carbohydrates": carbohydrates}
-                max_value = sorted(proportion.items(), key=lambda item: item[1])[-1]
-                result = [self.eaten_products.order_by(max_value[0]).last()]
-                return {"exclude": result}
+    def get_exclude_product(self) -> Product:
+        """
+        Получение рекомендованного к исключению продукта
+        """
+        # Необходимо съесть минимум 3 продукта
+        if len(self.eaten_products) > 2:
+            return self.__find_exclude_product()
         else:
             raise ValidationError({"status": "400", "error": "There are too low eating to make recommendations"})

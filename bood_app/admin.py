@@ -22,6 +22,7 @@ class ProductAdmin(admin.ModelAdmin):
         "title",
         "id",
     )
+    list_filter = ("category",)
     list_per_page = 20
     ordering = ["title"]
     fieldsets = [
@@ -44,7 +45,6 @@ class ProductAdmin(admin.ModelAdmin):
         "proteins_proportion",
         "fats_proportion",
         "carbohydrates_proportion",
-        "category",
     )
 
 
@@ -93,8 +93,8 @@ class MeasurementAdmin(admin.ModelAdmin):
 
 
 class EatingAdmin(admin.ModelAdmin):
-    list_display = ("id", "datetime_add", "product_weight", "recipe", "person_card", "get_weight")
-    list_filter = ("person_card", "datetime_add")
+    list_display = ("id", "datetime_add", "product_weight", "recipe", "water", "person_card", "get_weight")
+    list_filter = ("datetime_add",)
     search_fields = ("person_card__person__email",)
     list_display_links = ("datetime_add",)
     list_per_page = 20
@@ -104,7 +104,8 @@ class EatingAdmin(admin.ModelAdmin):
             return obj.product_weight.weight
         if obj.recipe:
             return sum(ProductWeight.objects.filter(recipe=obj.recipe).values_list("weight", flat=True))
-        return None
+        if obj.water:
+            return obj.water.weight
 
     get_weight.short_description = "Weight"
 

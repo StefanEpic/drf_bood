@@ -56,6 +56,9 @@ class BaseInitTestCase(APITestCase):
         self.category1 = ProductCategory.objects.create(title="Овощи")
         self.category2 = ProductCategory.objects.create(title="Птица")
         self.category3 = ProductCategory.objects.create(title="Хлеб")
+        self.category4 = ProductCategory.objects.create(title="Фрукты")
+        self.category5 = ProductCategory.objects.create(title="Крупы")
+        self.category6 = ProductCategory.objects.create(title="Рыба")
         self.product1 = Product.objects.create(
             title="Лук",
             proteins=0.014,
