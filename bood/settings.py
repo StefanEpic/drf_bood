@@ -34,6 +34,10 @@ ALLOWED_HOSTS = ["*"]
 # SESSION_COOKIE_SECURE = True
 SESSION_COOKIE_SECURE = False
 
+# Frontend APP
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
+
 # Application definition
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -47,6 +51,7 @@ INSTALLED_APPS = [
     "djoser",
     "drf_spectacular",
     "corsheaders",
+    "django_elasticsearch_dsl",
     # app
     "bood_account",
     "bood_app",
@@ -125,6 +130,14 @@ SIMPLE_JWT = {
     "UPDATE_LAST_LOGIN": True,
 }
 
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Boody API",
+    "DESCRIPTION": "Расчет КБЖУ",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": True,
+    # OTHER SETTINGS
+}
+
 # Email settings
 # https://docs.djangoproject.com/en/3.1/topics/email/
 # https://docs.djangoproject.com/en/3.1/ref/settings/#email-host
@@ -146,30 +159,25 @@ ACCOUNT_EMAIL_CONFIRMATION_EXPIRE_DAYS = 1
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
 # Sqllite
-# DATABASES = {
-#     "default": {
-#         "ENGINE": "django.db.backends.sqlite3",
-#         "NAME": BASE_DIR / "db.sqlite3",
-#     }
-# }
-
-# Postgresql
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": config.DB_NAME,
-        "USER": config.DB_USER,
-        "PASSWORD": config.DB_PASS,
-        "HOST": config.DB_HOST,
-        "PORT": config.DB_PORT,
-    }
-}
-
-if "test" in sys.argv:
-    DATABASES["default"] = {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": BASE_DIR / "db.sqlite3",
     }
+}
+
+# Postgresql
+# DATABASES = {
+#     "default": {
+#         "ENGINE": "django.db.backends.postgresql",
+#         "NAME": config.DB_NAME,
+#         "USER": config.DB_USER,
+#         "PASSWORD": config.DB_PASS,
+#         "HOST": config.DB_HOST,
+#         "PORT": config.DB_PORT,
+#     }
+# }
+
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
@@ -220,14 +228,28 @@ STATIC_URL = "/static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-SPECTACULAR_SETTINGS = {
-    "TITLE": "Boody API",
-    "DESCRIPTION": "Расчет КБЖУ",
-    "VERSION": "1.0.0",
-    "SERVE_INCLUDE_SCHEMA": True,
-    # OTHER SETTINGS
+# Cache
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": "redis://redis:6379",
+        "OPTIONS": {
+            "db": "1",
+        },
+    }
 }
 
-# Frontend APP
-CORS_ALLOW_ALL_ORIGINS = True
-CORS_ALLOW_CREDENTIALS = True
+# Elasticsearch
+ELASTICSEARCH_DSL = {
+    "default": {"hosts": "http://elasticsearch:9200"},
+}
+
+# Testing settings
+if "test" in sys.argv:
+    DATABASES["default"] = {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": BASE_DIR / "db.sqlite3",
+    }
+    CACHES["default"] = {
+        "BACKEND": "django.core.cache.backends.dummy.DummyCache",
+    }

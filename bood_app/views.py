@@ -1,3 +1,6 @@
+from django.core.cache import cache
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
 from rest_framework import viewsets, mixins
 from rest_framework.generics import RetrieveAPIView
 from rest_framework.permissions import IsAuthenticated
@@ -16,7 +19,9 @@ from .api_docs import (
     recommendation_exclude_summary,
     categoryrecommendation_list_summary,
     faq_list_summary,
+    product_search_summary,
 )
+from .documents import ProductDocument, ElasticFind
 from .filters import TitleSearchFilter, DateSearchFilter
 from .models import Product, PersonCard, Eating, Measurement, Recipe, FemaleType, ProductCategory, FAQ
 from .permissions import IsOwnerOrAdminPersonCard, IsOwnerOrAdmin
@@ -35,7 +40,9 @@ from .serializers import (
     FemaleTypeSerializer,
     ProductCategorySerializer,
     FAQSerializer,
+    ProductSearchSerializer,
 )
+from .utils.cache import get_or_set_model_cache, get_calculate_standard_cache, get_calculate_current_cache
 from .utils.view_validation import view_validation, calculate_view_validation
 
 
@@ -48,6 +55,24 @@ class ProductViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     filter_backends = [TitleSearchFilter]
     search_fields = ["title"]
 
+    @method_decorator(cache_page(60 * 60 * 1))
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+
+
+class ProductSearch(RetrieveAPIView):
+    permission_classes = [IsAuthenticated]
+    http_method_names = ["get", "head", "options"]
+
+    @product_search_summary
+    def get(self, request, *args, **kwargs) -> Response:
+        title = request.query_params.get("title", None)
+        result = []
+        if title:
+            result = ElasticFind(Product, ProductDocument).get_find("match", title=title)
+        serializer = ProductSearchSerializer(data=result, many=True)
+        return calculate_view_validation(serializer)
+
 
 @categoryrecommendation_list_summary
 class ProductCategoryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
@@ -57,6 +82,10 @@ class ProductCategoryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     http_method_names = ["get", "head", "options"]
     filter_backends = [TitleSearchFilter]
     search_fields = ["title"]
+
+    @method_decorator(cache_page(60 * 60 * 1))
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
 
 
 @faq_list_summary
@@ -68,6 +97,10 @@ class FAQViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     filter_backends = [TitleSearchFilter]
     search_fields = ["question"]
 
+    @method_decorator(cache_page(60 * 60 * 1))
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+
 
 @female_type_summary
 class FemaleTypeViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
@@ -75,6 +108,10 @@ class FemaleTypeViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     serializer_class = FemaleTypeSerializer
     permission_classes = [IsAuthenticated]
     http_method_names = ["get", "head", "options"]
+
+    @method_decorator(cache_page(60 * 60 * 1))
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
 
 
 @person_card_summary
@@ -92,8 +129,8 @@ class PersonCardView(
 
     def get_queryset(self):
         if self.request.user:
-            return PersonCard.objects.filter(person=self.request.user.pk)
-        return super().get_queryset()
+            user_id = self.request.user.id
+            return get_or_set_model_cache("person_card", user_id, PersonCard, person=user_id)
 
     def get_serializer_class(self):
         if self.request.method == "POST" or self.request.method == "PATCH":
@@ -122,8 +159,8 @@ class EatingViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         if self.request.user:
-            return Eating.objects.filter(person_card__person=self.request.user.pk)
-        return super().get_queryset()
+            user_id = self.request.user.id
+            return get_or_set_model_cache("eating", user_id, Eating, person_card__person=user_id)
 
     def get_serializer_class(self):
         if self.request.method == "POST" or self.request.method == "PATCH":
@@ -146,12 +183,17 @@ class StandardValuesView(RetrieveAPIView):
 
     @calculate_standard_retrieve_summary
     def get(self, request, *args, **kwargs) -> Response:
-        date = request.query_params.get("date", None)
         user_id = request.user.id
-        serializer = CalculateSerializer(
-            data=request.data, context={"date": date, "user_id": user_id, "calculate_type": "standard"}
-        )
-        return calculate_view_validation(serializer)
+        calculate_cache = get_calculate_standard_cache(user_id)
+        if calculate_cache:
+            return calculate_view_validation(calculate_cache)
+        else:
+            date = request.query_params.get("date", None)
+            serializer = CalculateSerializer(
+                data=request.data, context={"date": date, "user_id": user_id, "calculate_type": "standard"}
+            )
+            cache.set(f"calculate_standard_{user_id}", serializer, 60 * 60 * 1)
+            return calculate_view_validation(serializer)
 
 
 class CurrentValuesView(RetrieveAPIView):
@@ -159,12 +201,17 @@ class CurrentValuesView(RetrieveAPIView):
 
     @calculate_current_retrieve_summary
     def get(self, request, *args, **kwargs) -> Response:
-        date = request.query_params.get("date", None)
         user_id = request.user.id
-        serializer = CalculateSerializer(
-            data=request.data, context={"date": date, "user_id": user_id, "calculate_type": "current"}
-        )
-        return calculate_view_validation(serializer)
+        calculate_cache = get_calculate_current_cache(user_id)
+        if calculate_cache:
+            return calculate_view_validation(calculate_cache)
+        else:
+            date = request.query_params.get("date", None)
+            serializer = CalculateSerializer(
+                data=request.data, context={"date": date, "user_id": user_id, "calculate_type": "current"}
+            )
+            cache.set(f"calculate_current_{user_id}", serializer, 60 * 60 * 1)
+            return calculate_view_validation(serializer)
 
 
 @measurement_summary
@@ -176,8 +223,8 @@ class MeasurementViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         if self.request.user:
-            return Measurement.objects.filter(person_card__person=self.request.user.pk)
-        return super().get_queryset()
+            user_id = self.request.user.id
+            return get_or_set_model_cache("measurement", user_id, Measurement, person_card__person_id=user_id)
 
     def create(self, request, *args, **kwargs):
         user_id = request.user.id
@@ -200,9 +247,8 @@ class RecipeViewSet(viewsets.ModelViewSet):
     search_fields = ["title"]
 
     def get_queryset(self):
-        if self.request.user:
-            return Recipe.objects.filter(person_card__person=self.request.user.pk, is_active=True)
-        return super().get_queryset()
+        user_id = self.request.user.id
+        return get_or_set_model_cache("recipe", user_id, Recipe, person_card__person=user_id, is_active=True)
 
     def get_serializer_class(self):
         if self.request.method == "POST" or self.request.method == "PATCH":

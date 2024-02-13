@@ -1,0 +1,71 @@
+version: "3.7"
+services:
+  elasticsearch:
+    image: elasticsearch:7.17.18
+    container_name: elasticsearch
+    restart: always
+    environment:
+      - xpack.security.enabled=false
+      - discovery.type=single-node
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    cap_add:
+      - IPC_LOCK
+    expose:
+      - 9200
+    networks:
+      - custom
+
+  redis:
+    container_name: redis
+    image: redis:alpine
+    restart: always
+    command: redis-server
+    expose:
+      - 6379
+    networks:
+      - custom
+
+  bood_app:
+    container_name: bood_app
+    image: bood_app
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    volumes:
+      - ./static:/static
+    expose:
+      - 8000
+    depends_on:
+      - elasticsearch
+    networks:
+      - custom
+
+  web:
+    container_name: web
+    image: nginx:alpine
+    restart: always
+    ports:
+      - "8080:80"
+    volumes:
+      - static_volume:/static
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - bood_app
+      - redis
+      - elasticsearch
+    networks:
+      - custom
+
+networks:
+  custom:
+    driver: bridge
+
+volumes:
+  static_volume:

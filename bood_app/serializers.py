@@ -29,6 +29,16 @@ class ProductSerializer(serializers.ModelSerializer):
         read_only_fields = ("id", "title", "proteins", "fats", "carbohydrates", "calories", "water")
 
 
+class ProductSearchSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    title = serializers.CharField()
+    proteins = serializers.FloatField()
+    fats = serializers.FloatField()
+    carbohydrates = serializers.FloatField()
+    calories = serializers.FloatField()
+    water = serializers.FloatField()
+
+
 class ProductCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductCategory
@@ -352,7 +362,6 @@ class CalculateSerializer(serializers.Serializer):
 
 class RecommendationIncludeSerializer(serializers.Serializer):
     products = serializers.SerializerMethodField()
-    log = serializers.SerializerMethodField()
 
     def __init__(self, context=None, instance=None, *args, **kwargs):
         super().__init__(instance, *args, **kwargs)
@@ -362,15 +371,10 @@ class RecommendationIncludeSerializer(serializers.Serializer):
             date = timezone.now().date()
             person = RecommendationService(person_card, date)
             self.recommendation = person.get_include_products()
-            self.log = person.get_log_info()
 
     @extend_schema_field(ProductSerializerWithCategory(many=True))
     def get_products(self, obj):
         return ProductSerializerWithCategory(self.recommendation, many=True).data
-
-    @extend_schema_field(OpenApiTypes.OBJECT)
-    def get_log(self, obj):
-        return self.log
 
 
 class RecommendationExcludeSerializer(serializers.Serializer):

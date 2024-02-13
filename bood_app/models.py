@@ -2,6 +2,7 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 
 from bood_account.models import Person
+from bood_app.utils.cache import delete_model_cache_for_current_user
 from bood_app.utils.resources import GENDER_TYPE, TARGET_TYPE, ACTIVITY_TYPE
 
 
@@ -31,6 +32,12 @@ class PersonCard(models.Model):
     class Meta:
         verbose_name = "Карточка пользователя"
         verbose_name_plural = "Карточки пользователей"
+
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+        delete_model_cache_for_current_user("person_card", self.person.id)
+        delete_model_cache_for_current_user("calculate_standard", self.person.id)
+        delete_model_cache_for_current_user("calculate_current", self.person.id)
+        return super().save()
 
     def __str__(self) -> str:
         return str(self.person.email)
@@ -65,6 +72,12 @@ class Measurement(models.Model):
     class Meta:
         verbose_name = "Замер"
         verbose_name_plural = "Замеры"
+
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+        delete_model_cache_for_current_user("measurement", self.person_card.person.id)
+        delete_model_cache_for_current_user("calculate_standard", self.person_card.person.id)
+        delete_model_cache_for_current_user("calculate_current", self.person_card.person.id)
+        return super().save()
 
     def __str__(self) -> str:
         return str(self.person_card.person.email)
@@ -210,6 +223,10 @@ class Eating(models.Model):
         verbose_name = "Прием пищи"
         verbose_name_plural = "Приемы пищи"
 
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+        delete_model_cache_for_current_user("eating", self.person_card.person.id)
+        return super().save()
+
     def __str__(self) -> str:
         return str(self.person_card.person.email)
 
@@ -239,6 +256,14 @@ class ProductWeight(models.Model):
         verbose_name = "Продукт с весом"
         verbose_name_plural = "Продукты с весом"
 
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+        eating = Eating.objects.filter(product_weight=self.id).first()
+        if eating:
+            delete_model_cache_for_current_user("eating", eating.person_card.person.id)
+        if self.recipe:
+            delete_model_cache_for_current_user("recipe", self.recipe.person_card.person.id)
+        return super().save()
+
     def __str__(self) -> str:
         return str(self.product.title)
 
@@ -256,6 +281,10 @@ class Recipe(models.Model):
         verbose_name = "Рецепт"
         verbose_name_plural = "Рецепты"
 
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+        delete_model_cache_for_current_user("recipe", self.person_card.person.id)
+        return super().save()
+
     def __str__(self) -> str:
         return str(self.title)
 
@@ -266,6 +295,12 @@ class Water(models.Model):
     class Meta:
         verbose_name = "Вода"
         verbose_name_plural = "Вода"
+
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+        eating = Eating.objects.filter(water=self.id).first()
+        if eating:
+            delete_model_cache_for_current_user("eating", eating.person_card.person.id)
+        return super().save()
 
     def __str__(self) -> str:
         return str(self.weight)

@@ -14,6 +14,7 @@ from .views import (
     FemaleTypeViewSet,
     ProductCategoryViewSet,
     FAQViewSet,
+    ProductSearch,
 )
 
 router = DefaultRouter()
@@ -32,4 +33,5 @@ urlpatterns = [
     path("calculate/current/", CurrentValuesView.as_view(), name="current"),
     path("recommendation/include", RecommendationIncludeView.as_view(), name="recommendation_include"),
     path("recommendation/exclude", RecommendationExcludeView.as_view(), name="recommendation_exclude"),
+    path("products/elasticsearch/", ProductSearch.as_view(), name="product_elasticsearch"),
 ]

@@ -1,15 +1,24 @@
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
 
-from bood_app.serializers import CalculateSerializer, RecommendationIncludeSerializer, RecommendationExcludeSerializer
-
-####################################################
+from bood_app.serializers import (
+    CalculateSerializer,
+    RecommendationIncludeSerializer,
+    RecommendationExcludeSerializer,
+    ProductSearchSerializer,
+)
 
 product_list_summary = extend_schema_view(
     list=extend_schema(summary="Получение списка продуктов (есть фильтрация)", description="Поиск по названию продукта")
 )
 
-####################################################
+product_search_summary = extend_schema(
+    parameters=[OpenApiParameter("title", OpenApiTypes.STR, OpenApiParameter.QUERY)],
+    summary="Поиск продукта по названию",
+    description="Поиск продукта по названию",
+    request=None,
+    responses=ProductSearchSerializer(many=True),
+)
 
 categoryrecommendation_list_summary = extend_schema_view(
     list=extend_schema(
@@ -18,13 +27,9 @@ categoryrecommendation_list_summary = extend_schema_view(
     ),
 )
 
-####################################################
-
 faq_list_summary = extend_schema_view(
     list=extend_schema(summary="Часто задаваемые вопросы", description="Поиск по названию вопроса")
 )
-
-####################################################
 
 person_card_summary = extend_schema_view(
     list=extend_schema(summary="Получить свою карточку"),
@@ -33,13 +38,9 @@ person_card_summary = extend_schema_view(
     destroy=extend_schema(summary="Удаление карточки пользователя по id карточки"),
 )
 
-####################################################
-
 female_type_summary = extend_schema_view(
     list=extend_schema(summary="Получить типы женщин"),
 )
-
-####################################################
 
 measurement_summary = extend_schema_view(
     list=extend_schema(summary="Получить все свои замеры"),
@@ -49,8 +50,6 @@ measurement_summary = extend_schema_view(
     destroy=extend_schema(summary="Удаление замеров пользователя по id замера"),
 )
 
-####################################################
-
 recipe_summary = extend_schema_view(
     list=extend_schema(summary="Получить свой список рецептов"),
     retrieve=extend_schema(summary="Получить свой рецепт по ID"),
@@ -58,8 +57,6 @@ recipe_summary = extend_schema_view(
     partial_update=extend_schema(summary="Частичное изменение рецепта по ID"),
     destroy=extend_schema(summary="Удаление рецепта по ID"),
 )
-
-####################################################
 
 eating_summary = extend_schema_view(
     list=extend_schema(
@@ -81,8 +78,6 @@ eating_summary = extend_schema_view(
     ),
 )
 
-####################################################
-
 calculate_current_retrieve_summary = extend_schema(
     parameters=[OpenApiParameter("date", OpenApiTypes.DATE, OpenApiParameter.QUERY)],
     summary="Получение текущих КБЖУ пользователя на определенную дату",
@@ -100,7 +95,6 @@ calculate_standard_retrieve_summary = extend_schema(
     request=None,
     responses=CalculateSerializer,
 )
-####################################################
 
 recommendation_include_summary = extend_schema(
     summary="Получить рекомендацию по питанию",
@@ -110,8 +104,6 @@ recommendation_include_summary = extend_schema(
     responses=RecommendationIncludeSerializer,
 )
 
-####################################################
-
 recommendation_exclude_summary = extend_schema(
     summary="Получить рекомендацию по питанию",
     description="В зависимости от съеденных за сегодня продуктов выдается рекомендация "
@@ -119,5 +111,3 @@ recommendation_exclude_summary = extend_schema(
     request=None,
     responses=RecommendationExcludeSerializer,
 )
-
-####################################################

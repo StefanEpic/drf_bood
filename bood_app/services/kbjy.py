@@ -1,5 +1,3 @@
-import json
-
 from django.db.models import Q
 from rest_framework.exceptions import ValidationError
 
@@ -38,9 +36,8 @@ def get_measurements(person_card: PersonCard, date: datetime.date) -> Measuremen
         .order_by("-datetime_add")
         .first()
     )
-    log = json.dumps({"person_card": str(person_card.person.email), "date": str(date)}, ensure_ascii=False)
     if not measurements:
-        raise ValidationError({"status": "400", "error": "Measurements not found", "log": log})
+        raise ValidationError({"status": "400", "error": "Measurements not found"})
     return measurements
 
 
@@ -260,18 +257,6 @@ class RecommendationService(KBJYService):
                 product_weight__recipe__eating__person_card_id=self.person_card.pk,
             )
         )
-        self.log = json.dumps(
-            {
-                "person_card": str(self.person_card.person.email),
-                "measurements_person_card": str(self.measurements.person_card),
-                "measurements_datetime": str(self.measurements.datetime_add),
-                "autogenerate_today__date": str(self.date),
-                "standard": self.standard,
-                "current": self.current,
-                "eaten_products": [str(p) for p in self.eaten_products],
-            },
-            ensure_ascii=False,
-        )
 
     def __find_exclude_product(self) -> Product:
         """
@@ -392,12 +377,7 @@ class RecommendationService(KBJYService):
                     exclude_product,
                 )
         else:
-            raise ValidationError(
-                {"status": "400", "error": "There are too low eating to make recommendations", "log": self.log}
-            )
-
-    def get_log_info(self):
-        return self.log
+            raise ValidationError({"status": "400", "error": "There are too low eating to make recommendations"})
 
     def get_exclude_product(self) -> Product:
         """
