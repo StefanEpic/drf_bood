@@ -2,6 +2,8 @@
 
 ![Django](https://img.shields.io/badge/Django-darkgreen?style=flat&logo=django&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-blue?style=flat&logo=postgresql&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-DC382D?style=flat&logo=redis&logoColor=white)
+![Elasticsearch](https://img.shields.io/badge/Elasticsearch-005571?style=flat&logo=elastic&logoColor=white)
 
 💪 АPI for for counting calories, proteins, fats and carbohydrates.
 
