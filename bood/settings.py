@@ -159,25 +159,24 @@ ACCOUNT_EMAIL_CONFIRMATION_EXPIRE_DAYS = 1
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
 # Sqllite
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    }
-}
-
-# Postgresql
 # DATABASES = {
 #     "default": {
-#         "ENGINE": "django.db.backends.postgresql",
-#         "NAME": config.DB_NAME,
-#         "USER": config.DB_USER,
-#         "PASSWORD": config.DB_PASS,
-#         "HOST": config.DB_HOST,
-#         "PORT": config.DB_PORT,
+#         "ENGINE": "django.db.backends.sqlite3",
+#         "NAME": BASE_DIR / "db.sqlite3",
 #     }
 # }
 
+# Postgresql
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": config.DB_NAME,
+        "USER": config.DB_USER,
+        "PASSWORD": config.DB_PASS,
+        "HOST": config.DB_HOST,
+        "PORT": config.DB_PORT,
+    }
+}
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
@@ -232,7 +231,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": "redis://localhost:6379",
+        "LOCATION": "redis://redis:6379",
         "OPTIONS": {
             "db": "1",
         },
@@ -241,7 +240,7 @@ CACHES = {
 
 # Elasticsearch
 ELASTICSEARCH_DSL = {
-    "default": {"hosts": "http://localhost:9200"},
+    "default": {"hosts": "http://elasticsearch:9200"},
 }
 
 # Testing settings
