@@ -3,7 +3,7 @@ from rest_framework import serializers, status
 
 def eating_validation(product_weight: dict, recipe: int, water: dict) -> None:
     """
-    Проверка наличия только одного элемента
+    Проверка наличия только одного элемента.
     """
     elements = [product_weight, recipe, water]
 

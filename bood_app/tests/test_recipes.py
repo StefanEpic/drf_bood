@@ -64,7 +64,8 @@ class RecipeTestCase(BaseInitTestCase):
         self.assertEqual(response.data["detail"]["title"], data["title"])
         self.assertEqual(response.data["detail"]["description"], data["description"])
         self.assertEqual(response.data["detail"]["image"], data["image"])
-        self.assertEqual(response.data["detail"]["product_weight"][0]["weight"], 120)
+        self.assertEqual(response.data["detail"]["product_weight"][0]["weight"], 40)
+        self.assertEqual(response.data["detail"]["product_weight"][1]["weight"], 80)
 
     def test_post_invalid_zero_product(self) -> None:
         data = {"title": "Test", "description": "", "image": "", "product_weight": []}
@@ -93,7 +94,8 @@ class RecipeTestCase(BaseInitTestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["status"], "200")
         self.assertEqual(response.data["detail"]["title"], data["title"])
-        self.assertEqual(response.data["detail"]["product_weight"][0]["weight"], 120)
+        self.assertEqual(response.data["detail"]["product_weight"][0]["weight"], 40)
+        self.assertEqual(response.data["detail"]["product_weight"][1]["weight"], 80)
 
     def test_delete_valid(self) -> None:
         response = self.client.delete(self.url_detail, headers=self.token)

@@ -16,10 +16,12 @@ from .models import (
     ProductCategory,
     FAQ,
 )
-from .services.kbjy import KBJYService, RecommendationService
-from .utils.calculate_date_validation import check_dateformat_or_get_current_date
-from .utils.eating_validation import eating_validation
-from .utils.person_card_validation import get_person_card
+from .services.calculate import CalculateService
+from .services.recommendation import RecommendationService
+from bood_app.utils.serializers.calculate_date_validation import check_dateformat_or_get_current_date
+from bood_app.utils.serializers.eating_validation import eating_validation
+from bood_app.utils.serializers.person_card_validation import get_person_card
+from .utils.serializers.product_weight_create import create_product_weight_instances
 
 
 class ProductSerializer(serializers.ModelSerializer):
@@ -182,19 +184,6 @@ class PostRecipeSerializer(serializers.ModelSerializer):
         fields = ("id", "title", "description", "person_card", "image", "is_active", "product_weight")
         read_only_fields = ("id", "person_card", "is_active")
 
-    @staticmethod
-    def __product_weight_create(product_weight, recipe):
-        for product in product_weight:
-            added_products = ProductWeight.objects.filter(recipe=recipe)
-            if added_products and product["product"].pk in [name.product.pk for name in added_products]:
-                for added_product in added_products:
-                    if added_product.product.pk == product["product"].pk:
-                        added_product.weight += product["weight"]
-                        added_product.save()
-                        break
-                continue
-            ProductWeight.objects.create(recipe=recipe, **product)
-
     def create(self, validated_data):
         product_weight = validated_data.pop("product_weight")
         if not product_weight:
@@ -205,7 +194,7 @@ class PostRecipeSerializer(serializers.ModelSerializer):
         recipe = Recipe.objects.create(person_card=person_card, **validated_data)
         recipe.save()
 
-        self.__product_weight_create(product_weight, recipe)
+        create_product_weight_instances(product_weight, recipe)
         return recipe
 
     def update(self, instance, validated_data):
@@ -216,7 +205,7 @@ class PostRecipeSerializer(serializers.ModelSerializer):
         instance.save()
         product_weight = validated_data.pop("product_weight")
 
-        self.__product_weight_create(product_weight, instance)
+        create_product_weight_instances(product_weight, instance)
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
@@ -314,7 +303,7 @@ class CalculateSerializer(serializers.Serializer):
             calculate_type = context["calculate_type"]
             date = check_dateformat_or_get_current_date(str_date)
             person_card = get_person_card(user_id)
-            person = KBJYService(person_card, date)
+            person = CalculateService(person_card, date)
             imt = person.get_imt()
             if calculate_type == "standard":
                 result = person.get_standard()

@@ -43,7 +43,7 @@ from .serializers import (
     ProductSearchSerializer,
 )
 from .utils.cache import get_or_set_model_cache, get_calculate_standard_cache, get_calculate_current_cache
-from .utils.view_validation import view_validation, calculate_view_validation
+from bood_app.utils.views.view_validation import view_validation, calculate_view_validation
 
 
 @product_list_summary

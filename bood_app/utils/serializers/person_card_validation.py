@@ -7,7 +7,7 @@ from bood_app.models import PersonCard
 
 def get_person_card(user_id: int) -> Union[PersonCard, None]:
     """
-    Проверка наличия person card
+    Проверка наличия person card.
     """
     person_card = PersonCard.objects.filter(person__id=user_id).first()
     if person_card is None:

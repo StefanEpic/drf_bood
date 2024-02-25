@@ -232,7 +232,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": "redis://redis:6379",
+        "LOCATION": "redis://localhost:6379",
         "OPTIONS": {
             "db": "1",
         },
@@ -241,7 +241,7 @@ CACHES = {
 
 # Elasticsearch
 ELASTICSEARCH_DSL = {
-    "default": {"hosts": "http://elasticsearch:9200"},
+    "default": {"hosts": "http://localhost:9200"},
 }
 
 # Testing settings

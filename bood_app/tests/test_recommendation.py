@@ -16,13 +16,13 @@ class RecommendationTestCase(BaseInitTestCase):
         # БЖУ ниже нормы
         self.eating4 = Eating.objects.create(recipe=self.recipe, person_card=self.person_card1)
         product = {
-            "id": 3,
-            "title": "Батон",
-            "proteins": 0.077,
-            "fats": 0.03,
-            "carbohydrates": 0.501,
-            "calories": 2.59,
-            "water": 0.341,
+            "id": 1,
+            "title": "Лук",
+            "proteins": 0.014,
+            "fats": 0.002,
+            "carbohydrates": 0.082,
+            "calories": 0.41,
+            "water": 0.86,
         }
 
         response = self.client.get(self.url_include, headers=self.token)
@@ -82,13 +82,13 @@ class RecommendationTestCase(BaseInitTestCase):
         self.productweight3 = ProductWeight.objects.create(weight=170, product=self.product2)
         self.eating4 = Eating.objects.create(product_weight=self.productweight3, person_card=self.person_card1)
         product = {
-            "id": 1,
-            "title": "Лук",
-            "proteins": 0.014,
-            "fats": 0.002,
-            "carbohydrates": 0.082,
-            "calories": 0.41,
-            "water": 0.86,
+            "id": 3,
+            "title": "Батон",
+            "proteins": 0.077,
+            "fats": 0.03,
+            "carbohydrates": 0.501,
+            "calories": 2.59,
+            "water": 0.341,
         }
 
         response = self.client.get(self.url_include, headers=self.token)

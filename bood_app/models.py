@@ -3,7 +3,7 @@ from django.db import models
 
 from bood_account.models import Person
 from bood_app.utils.cache import delete_model_cache_for_current_user
-from bood_app.utils.resources import GENDER_TYPE, TARGET_TYPE, ACTIVITY_TYPE
+from bood_app.utils.models.resources import GENDER_TYPE, TARGET_TYPE, ACTIVITY_TYPE
 
 
 class PersonCard(models.Model):

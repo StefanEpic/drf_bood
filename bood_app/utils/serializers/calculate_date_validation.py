@@ -7,7 +7,7 @@ from rest_framework.exceptions import ValidationError
 
 def check_dateformat_or_get_current_date(str_date: str) -> Union[datetime.date, None]:
     """
-    Проверка формата даты или получение текущей даты
+    Проверка формата даты или получение текущей даты.
     """
     if str_date:
         try:
